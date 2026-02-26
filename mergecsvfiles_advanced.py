@@ -69,18 +69,18 @@ class AdvancedCSVMergerApp:
         
         # Configure style
         if USE_TTB and TBStyle is not None:
-            style = TBStyle(theme='flatly')
+            self.style = TBStyle(theme='darkly')
         else:
-            style = ttk.Style()
-            style.theme_use('clam')
+            self.style = ttk.Style()
+            self.style.theme_use('clam')
         # Polish default fonts and paddings for a cleaner look
         default_font = ("Segoe UI", 10)
         try:
-            style.configure('.', font=default_font)
-            style.configure('TButton', padding=6)
-            style.configure('TLabel', padding=4)
-            style.configure('TFrame', padding=6)
-            style.configure('TNotebook.Tab', padding=[12, 6])
+            self.style.configure('.', font=default_font)
+            self.style.configure('TButton', padding=6)
+            self.style.configure('TLabel', padding=4)
+            self.style.configure('TFrame', padding=6)
+            self.style.configure('TNotebook.Tab', padding=[12, 6])
         except Exception:
             pass
         
@@ -135,8 +135,12 @@ class AdvancedCSVMergerApp:
         except:
             pass
     
+    def change_theme(self, event=None):
+        if USE_TTB and hasattr(self, 'style'):
+            self.style.theme_use(self.theme_var.get())
+
     def create_widgets(self):
-        """Create main GUI with notebook tabs"""
+        """Create main GUI with sidebar layout"""
         # Create menubar
         menubar = tk.Menu(self.root)
         file_menu = tk.Menu(menubar, tearoff=0)
@@ -154,27 +158,6 @@ class AdvancedCSVMergerApp:
         menubar.add_cascade(label='Help', menu=help_menu)
         self.root.config(menu=menubar)
 
-        # Toolbar (quick actions)
-        toolbar = ttk.Frame(self.root)
-        toolbar.pack(fill=tk.X, padx=8, pady=(8, 0))
-        self.btn_add_files = ttk.Button(toolbar, text='➕ Add Files', command=self.add_csv_files)
-        self.btn_add_files.pack(side=tk.LEFT, padx=6)
-        self.btn_add_folder = ttk.Button(toolbar, text='📁 Add Folder', command=self.add_folder_files)
-        self.btn_add_folder.pack(side=tk.LEFT, padx=6)
-        self.btn_preview = ttk.Button(toolbar, text='👁️ Preview', command=self.generate_preview)
-        self.btn_preview.pack(side=tk.LEFT, padx=6)
-        self.btn_merge = ttk.Button(toolbar, text='▶ Merge', command=self.start_merge)
-        self.btn_merge.pack(side=tk.LEFT, padx=6)
-
-        # Tooltips for toolbar
-        try:
-            Tooltip(self.btn_add_files, 'Add CSV files (Ctrl+O)')
-            Tooltip(self.btn_add_folder, 'Add all CSV files from a folder (Ctrl+F)')
-            Tooltip(self.btn_preview, 'Generate merged preview (Ctrl+P)')
-            Tooltip(self.btn_merge, 'Run merge now (Ctrl+M)')
-        except Exception:
-            pass
-
         # Keyboard shortcuts
         self.root.bind('<Control-o>', lambda e: self.add_csv_files())
         self.root.bind('<Control-f>', lambda e: self.add_folder_files())
@@ -182,315 +165,332 @@ class AdvancedCSVMergerApp:
         self.root.bind('<Control-m>', lambda e: self.start_merge())
         self.root.bind('<Control-s>', lambda e: self.save_settings())
 
-        # Create notebook (tabs)
-        self.notebook = ttk.Notebook(self.root)
-        self.notebook.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
-        
-        # Tab 1: File Selection
-        self.create_file_selection_tab()
-        
-        # Tab 2: Column Management
-        self.create_column_management_tab()
-        
-        # Tab 3: Data Filtering & Validation
-        self.create_filtering_tab()
-        
-        # Tab 4: Merge & Export Options
-        self.create_merge_options_tab()
-        
-        # Tab 5: Preview & Statistics
-        self.create_preview_tab()
-        
-        # Tab 6: Batch Processing
-        self.create_batch_tab()
-    
-    def create_file_selection_tab(self):
-        """Tab 1: File Selection and Configuration"""
-        tab = ttk.Frame(self.notebook, padding="15")
-        self.notebook.add(tab, text="📁 Files & Settings")
-        
-        # Header
-        ttk.Label(tab, text="Step 1: Select CSV Files", font=("Segoe UI", 14, "bold")).pack(anchor=tk.W, pady=(0, 15))
-        
-        # File buttons
-        btn_frame = ttk.Frame(tab)
-        btn_frame.pack(fill=tk.X, pady=(0, 15))
-        
-        ttk.Button(btn_frame, text="➕ Add CSV Files", command=self.add_csv_files, width=20).pack(side=tk.LEFT, padx=5)
-        ttk.Button(btn_frame, text="📁 Add Folder", command=self.add_folder_files, width=20).pack(side=tk.LEFT, padx=5)
-        ttk.Button(btn_frame, text="🗑 Clear All", command=self.clear_all_files, width=15).pack(side=tk.LEFT, padx=5)
-        ttk.Button(btn_frame, text="📜 Recent Files", command=self.show_recent_files, width=15).pack(side=tk.LEFT, padx=5)
-        
-        # File list
-        list_frame = ttk.LabelFrame(tab, text="Selected Files", padding="10")
-        list_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 15))
-        
-        # Use Treeview for a cleaner multi-column file list
-        scrollbar = ttk.Scrollbar(list_frame)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-
-        self.files_tree = ttk.Treeview(list_frame, columns=('name', 'path'), show='headings', height=8)
-        self.files_tree.heading('name', text='Filename')
-        self.files_tree.heading('path', text='Folder')
-        self.files_tree.column('name', width=260)
-        self.files_tree.column('path', width=520)
-        self.files_tree.pack(fill=tk.BOTH, expand=True)
-        scrollbar.config(command=self.files_tree.yview)
-        self.files_tree.bind('<Delete>', lambda e: self.remove_selected_files())
-        self.files_tree.bind('<Double-1>', lambda e: self.open_selected_file())
-        self.files_tree.bind('<Button-3>', self.show_files_context_menu)
-        
-        self.file_count_label = ttk.Label(tab, text="No files selected", foreground="gray")
-        self.file_count_label.pack(anchor=tk.W)
-        
-        # Output filename
-        config_frame = ttk.LabelFrame(tab, text="Output Configuration", padding="10")
-        config_frame.pack(fill=tk.X, pady=(0, 15))
-        
-        ttk.Label(config_frame, text="Output filename:", font=("Segoe UI", 9)).pack(anchor=tk.W)
-        ttk.Entry(config_frame, textvariable=self.output_filename, width=60).pack(fill=tk.X, pady=(5, 0))
-        # Output directory chooser
-        out_dir_frame = ttk.Frame(config_frame)
-        out_dir_frame.pack(fill=tk.X, pady=(8, 0))
-        ttk.Label(out_dir_frame, text="Output folder:").pack(side=tk.LEFT)
-        ttk.Entry(out_dir_frame, textvariable=self.output_dir, width=48).pack(side=tk.LEFT, padx=(8, 6))
-        ttk.Button(out_dir_frame, text='Browse...', command=self.browse_output_dir).pack(side=tk.LEFT)
-        
-        # Encoding info
-        encoding_frame = ttk.LabelFrame(tab, text="File Encoding", padding="10")
-        encoding_frame.pack(fill=tk.X)
-        
-        ttk.Label(encoding_frame, text="Encoding will be auto-detected for each file", foreground="gray", font=("Segoe UI", 9)).pack(anchor=tk.W)
-        ttk.Button(encoding_frame, text="🔍 Detect Encodings", command=self.detect_encodings, width=20).pack(anchor=tk.W)
-    
-    def create_column_management_tab(self):
-        """Tab 2: Column Selection & Mapping"""
-        tab = ttk.Frame(self.notebook, padding="15")
-        self.notebook.add(tab, text="📋 Columns")
-        
-        ttk.Label(tab, text="Step 2: Manage Columns", font=("Segoe UI", 14, "bold")).pack(anchor=tk.W, pady=(0, 15))
-        
-        # Column selection frame
-        select_frame = ttk.LabelFrame(tab, text="Column Selection", padding="10")
-        select_frame.pack(fill=tk.X, pady=(0, 15))
-        
-        ttk.Label(select_frame, text="Select columns to include (leave empty = all columns)", font=("Segoe UI", 9)).pack(anchor=tk.W)
-        ttk.Button(select_frame, text="🔍 Configure Columns...", command=self.open_column_selector, width=25).pack(anchor=tk.W, pady=(5, 0))
-        
-        self.selected_cols_text = tk.Text(select_frame, height=5, width=60, state='disabled', bg='#f5f5f5')
-        self.selected_cols_text.pack(fill=tk.BOTH, expand=True, pady=(5, 0))
-        
-        # Column mapping frame
-        mapping_frame = ttk.LabelFrame(tab, text="Column Mapping (Rename/Unify)", padding="10")
-        mapping_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 15))
-        
-        ttk.Label(mapping_frame, text="Map different column names to same column", font=("Segoe UI", 9)).pack(anchor=tk.W)
-        ttk.Button(mapping_frame, text="🗺️ Set Column Mapping...", command=self.open_column_mapping, width=25).pack(anchor=tk.W, pady=(5, 0))
-        
-        self.mapping_text = tk.Text(mapping_frame, height=6, width=60, state='disabled', bg='#f5f5f5')
-        self.mapping_text.pack(fill=tk.BOTH, expand=True, pady=(5, 0))
-        
-        # Duplicate column handling
-        dup_frame = ttk.LabelFrame(tab, text="Duplicate Column Handling", padding="10")
-        dup_frame.pack(fill=tk.X)
-        
-        ttk.Radiobutton(dup_frame, text="Keep all (rename with suffix _0, _1, etc.)", variable=self.duplicate_strategy, value='keep_all').pack(anchor=tk.W)
-        ttk.Radiobutton(dup_frame, text="Keep first occurrence", variable=self.duplicate_strategy, value='first').pack(anchor=tk.W)
-        ttk.Radiobutton(dup_frame, text="Keep last occurrence", variable=self.duplicate_strategy, value='last').pack(anchor=tk.W)
-        ttk.Radiobutton(dup_frame, text="Merge duplicate columns (concatenate values)", variable=self.duplicate_strategy, value='merge').pack(anchor=tk.W)
-    
-    def create_filtering_tab(self):
-        """Tab 3: Data Filtering & Validation"""
-        tab = ttk.Frame(self.notebook, padding="15")
-        self.notebook.add(tab, text="🔍 Filtering & Validation")
-        
-        ttk.Label(tab, text="Step 3: Filter & Validate Data", font=("Segoe UI", 14, "bold")).pack(anchor=tk.W, pady=(0, 15))
-        
-        # Filtering frame
-        filter_frame = ttk.LabelFrame(tab, text="Data Filtering", padding="10")
-        filter_frame.pack(fill=tk.X, pady=(0, 15))
-        
-        ttk.Label(filter_frame, text="Apply filters before merging (e.g., date range, column values)", font=("Segoe UI", 9)).pack(anchor=tk.W)
-        ttk.Button(filter_frame, text="➕ Add Filter...", command=self.add_filter, width=20).pack(anchor=tk.W, pady=(5, 0))
-        
-        self.filters_text = tk.Text(filter_frame, height=6, width=80, state='disabled', bg='#f5f5f5', font=("Courier", 9))
-        self.filters_text.pack(fill=tk.BOTH, expand=True, pady=(5, 0))
-        
-        self.clear_filters_btn = ttk.Button(filter_frame, text="🗑 Clear All Filters", command=self.clear_filters, width=20)
-        self.clear_filters_btn.pack(anchor=tk.W, pady=(5, 0))
-        
-        # Missing data handling
-        missing_frame = ttk.LabelFrame(tab, text="Missing Data Handling", padding="10")
-        missing_frame.pack(fill=tk.X, pady=(0, 15))
-        
-        ttk.Radiobutton(missing_frame, text="Keep empty values", variable=self.missing_data_strategy, value='keep').pack(anchor=tk.W)
-        ttk.Radiobutton(missing_frame, text="Drop rows with missing data", variable=self.missing_data_strategy, value='drop').pack(anchor=tk.W)
-        ttk.Radiobutton(missing_frame, text="Fill with 0", variable=self.missing_data_strategy, value='zero').pack(anchor=tk.W)
-        ttk.Radiobutton(missing_frame, text="Fill with 'N/A'", variable=self.missing_data_strategy, value='na').pack(anchor=tk.W)
-        ttk.Radiobutton(missing_frame, text="Forward fill (use previous value)", variable=self.missing_data_strategy, value='ffill').pack(anchor=tk.W)
-        ttk.Radiobutton(missing_frame, text="Backward fill (use next value)", variable=self.missing_data_strategy, value='bfill').pack(anchor=tk.W)
-        
-        # Validation rules
-        valid_frame = ttk.LabelFrame(tab, text="Data Validation Rules", padding="10")
-        valid_frame.pack(fill=tk.BOTH, expand=True)
-        
-        ttk.Label(valid_frame, text="Set validation rules to check data quality", font=("Segoe UI", 9)).pack(anchor=tk.W)
-        ttk.Button(valid_frame, text="✔️ Add Validation Rule...", command=self.add_validation_rule, width=25).pack(anchor=tk.W, pady=(5, 0))
-        
-        self.validation_text = tk.Text(valid_frame, height=6, width=80, state='disabled', bg='#f5f5f5', font=("Courier", 9))
-        self.validation_text.pack(fill=tk.BOTH, expand=True, pady=(5, 0))
-    
-    def create_merge_options_tab(self):
-        """Tab 4: Merge & Export Options"""
-        tab = ttk.Frame(self.notebook, padding="15")
-        self.notebook.add(tab, text="⚙️ Merge Options")
-        
-        ttk.Label(tab, text="Step 4: Configure Merge & Export", font=("Segoe UI", 14, "bold")).pack(anchor=tk.W, pady=(0, 15))
-        
-        # Merge type
-        merge_frame = ttk.LabelFrame(tab, text="Merge Type", padding="10")
-        merge_frame.pack(fill=tk.X, pady=(0, 15))
-        
-        ttk.Radiobutton(merge_frame, text="Concatenate (stack all rows)", variable=self.merge_type, value='concatenate', command=self.on_merge_type_change).pack(anchor=tk.W)
-        ttk.Radiobutton(merge_frame, text="Join on column (SQL-like)", variable=self.merge_type, value='join', command=self.on_merge_type_change).pack(anchor=tk.W)
-        
-        # Join configuration
-        self.join_frame = ttk.LabelFrame(tab, text="Join Configuration", padding="10")
-        self.join_frame.pack(fill=tk.X, pady=(0, 15))
-        
-        ttk.Label(self.join_frame, text="Join Column (Left):", font=("Segoe UI", 9)).grid(row=0, column=0, sticky=tk.W)
-        ttk.Combobox(self.join_frame, textvariable=self.join_column_left, width=20, state='readonly').grid(row=0, column=1, padx=5)
-        
-        ttk.Label(self.join_frame, text="Join Column (Right):", font=("Segoe UI", 9)).grid(row=1, column=0, sticky=tk.W, pady=(5, 0))
-        ttk.Combobox(self.join_frame, textvariable=self.join_column_right, width=20, state='readonly').grid(row=1, column=1, padx=5, pady=(5, 0))
-        
-        self.join_frame.pack_forget()  # Hide by default
-        
-        # Duplicate row removal
-        dup_row_frame = ttk.LabelFrame(tab, text="Duplicate Row Handling", padding="10")
-        dup_row_frame.pack(fill=tk.X, pady=(0, 15))
-        
-        ttk.Checkbutton(dup_row_frame, text="Remove duplicate rows", variable=self.remove_duplicate_rows).pack(anchor=tk.W)
-        ttk.Label(dup_row_frame, text="Keep:").pack(anchor=tk.W, padx=(20, 0))
-        ttk.Combobox(dup_row_frame, textvariable=self.duplicate_row_keep, values=['first', 'last'], width=12, state='readonly').pack(anchor=tk.W, padx=20)
-        
-        # Sorting
-        sort_frame = ttk.LabelFrame(tab, text="Sorting", padding="10")
-        sort_frame.pack(fill=tk.X, pady=(0, 15))
-        
-        ttk.Radiobutton(sort_frame, text="No sorting", variable=self.sort_option, value='none').pack(anchor=tk.W)
-        ttk.Radiobutton(sort_frame, text="Auto-detect date column", variable=self.sort_option, value='date').pack(anchor=tk.W)
-        ttk.Radiobutton(sort_frame, text="Custom column", variable=self.sort_option, value='custom').pack(anchor=tk.W)
-        
-        sort_config_frame = ttk.Frame(sort_frame)
-        sort_config_frame.pack(fill=tk.X, padx=20, pady=(5, 0))
-        
-        ttk.Label(sort_config_frame, text="Column:").pack(side=tk.LEFT)
-        self.sort_column_combo = ttk.Combobox(sort_config_frame, textvariable=self.sort_column, width=30, state='readonly')
-        self.sort_column_combo.pack(side=tk.LEFT, padx=(5, 20))
-        
-        ttk.Label(sort_config_frame, text="Order:").pack(side=tk.LEFT)
-        ttk.Radiobutton(sort_config_frame, text="Ascending", variable=self.sort_order, value='ascending').pack(side=tk.LEFT, padx=(5, 20))
-        ttk.Radiobutton(sort_config_frame, text="Descending", variable=self.sort_order, value='descending').pack(side=tk.LEFT)
-        
-        # Export format
-        export_frame = ttk.LabelFrame(tab, text="Export Format", padding="10")
-        export_frame.pack(fill=tk.X)
-        
-        ttk.Radiobutton(export_frame, text="CSV", variable=self.export_format, value='csv').pack(anchor=tk.W)
-        ttk.Radiobutton(export_frame, text="Excel (.xlsx)", variable=self.export_format, value='excel').pack(anchor=tk.W)
-        ttk.Radiobutton(export_frame, text="JSON", variable=self.export_format, value='json').pack(anchor=tk.W)
-        ttk.Radiobutton(export_frame, text="TSV (Tab-separated)", variable=self.export_format, value='tsv').pack(anchor=tk.W)
-        
-        # Run merge now
-        ttk.Button(tab, text="▶ Run Merge Now", command=self.start_merge, width=20).pack(pady=(15, 0))
-    
-    def create_preview_tab(self):
-        """Tab 5: Preview & Statistics"""
-        tab = ttk.Frame(self.notebook, padding="15")
-        self.notebook.add(tab, text="👁️ Preview & Statistics")
-        
-        ttk.Label(tab, text="Step 5: Preview & Review", font=("Segoe UI", 14, "bold")).pack(anchor=tk.W, pady=(0, 15))
-        
-        # Statistics frame
-        stats_frame = ttk.LabelFrame(tab, text="Data Statistics", padding="10")
-        stats_frame.pack(fill=tk.X, pady=(0, 15))
-        
-        ttk.Button(stats_frame, text="📊 Show Statistics...", command=self.show_statistics, width=25).pack(anchor=tk.W)
-        
-        # Preview frame
-        preview_frame = ttk.LabelFrame(tab, text="Data Preview (First 20 rows)", padding="10")
-        preview_frame.pack(fill=tk.BOTH, expand=True)
-        
-        ttk.Button(preview_frame, text="👁️ Generate Preview", command=self.generate_preview, width=25).pack(anchor=tk.W, pady=(0, 5))
-        
-        scrollbar = ttk.Scrollbar(preview_frame)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        
-        self.preview_text = tk.Text(preview_frame, height=25, width=120, yscrollcommand=scrollbar.set, bg='white', font=("Courier New", 8))
-        self.preview_text.pack(fill=tk.BOTH, expand=True)
-        scrollbar.config(command=self.preview_text.yview)
-        
-        # Info label
-        ttk.Label(tab, text="Tip: Generate preview before merging to verify configuration", foreground="gray", font=("Segoe UI", 9)).pack(anchor=tk.W, pady=(10, 0))
-    
-    def create_batch_tab(self):
-        """Tab 6: Batch Processing & History"""
-        tab = ttk.Frame(self.notebook, padding="15")
-        self.notebook.add(tab, text="⚡ Batch & History")
-        
-        ttk.Label(tab, text="Batch Processing & History", font=("Segoe UI", 14, "bold")).pack(anchor=tk.W, pady=(0, 15))
-        
-        # Batch frame
-        batch_frame = ttk.LabelFrame(tab, text="Batch Processing", padding="10")
-        batch_frame.pack(fill=tk.X, pady=(0, 15))
-        
-        ttk.Label(batch_frame, text="Save current configuration and run multiple merges", font=("Segoe UI", 9)).pack(anchor=tk.W)
-        
-        batch_btn_frame = ttk.Frame(batch_frame)
-        batch_btn_frame.pack(fill=tk.X, pady=(5, 0))
-        
-        ttk.Button(batch_btn_frame, text="💾 Save Config", command=self.save_batch_config, width=20).pack(side=tk.LEFT, padx=5)
-        ttk.Button(batch_btn_frame, text="📂 Load Config", command=self.load_batch_config, width=20).pack(side=tk.LEFT, padx=5)
-        ttk.Button(batch_btn_frame, text="🚀 Run Batch", command=self.run_batch_merge, width=15).pack(side=tk.LEFT, padx=5)
-        
-        self.batch_text = tk.Text(batch_frame, height=6, width=100, state='disabled', bg='#f5f5f5', font=("Courier", 9))
-        self.batch_text.pack(fill=tk.BOTH, expand=True, pady=(5, 0))
-        
-        # Recent files frame
-        recent_frame = ttk.LabelFrame(tab, text="Recent Merge Operations", padding="10")
-        recent_frame.pack(fill=tk.BOTH, expand=True)
-        
-        ttk.Label(recent_frame, text="Previously merged files", font=("Segoe UI", 9)).pack(anchor=tk.W)
-        
-        scrollbar = ttk.Scrollbar(recent_frame)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        
-        self.recent_listbox = tk.Listbox(recent_frame, height=10, yscrollcommand=scrollbar.set, font=("Courier New", 9))
-        self.recent_listbox.pack(fill=tk.BOTH, expand=True)
-        scrollbar.config(command=self.recent_listbox.yview)
-        
-        self.update_recent_list()
-        self.update_batch_display()
+        # Main layout container
+        self.main_container = ttk.Frame(self.root)
+        self.main_container.pack(fill=tk.BOTH, expand=True)
+        
+        # Sidebar
+        self.sidebar = ttk.Frame(self.main_container, width=220, relief=tk.RAISED, borderwidth=1)
+        self.sidebar.pack(side=tk.LEFT, fill=tk.Y)
+        self.sidebar.pack_propagate(False) # fixed width
+        
+        # Sidebar Header
+        ttk.Label(self.sidebar, text="CSV Merger Pro", font=("Segoe UI", 16, "bold"), anchor="center").pack(pady=20, padx=10, fill=tk.X)
+        
+        # Theme Switcher (Bottom of sidebar)
+        if USE_TTB:
+            theme_frame = ttk.Frame(self.sidebar)
+            theme_frame.pack(side=tk.BOTTOM, fill=tk.X, padx=10, pady=20)
+            ttk.Label(theme_frame, text="🎨 Theme:", font=("Segoe UI", 9)).pack(anchor=tk.W)
+            self.theme_var = tk.StringVar(value=self.style.theme.name if hasattr(self.style, 'theme') else 'darkly')
+            self.theme_cb = ttk.Combobox(theme_frame, textvariable=self.theme_var, values=self.style.theme_names() if hasattr(self.style, 'theme_names') else ['darkly'], state='readonly')
+            self.theme_cb.pack(fill=tk.X, pady=(2, 0))
+            self.theme_cb.bind('<<ComboboxSelected>>', self.change_theme)
+        
+        # Sidebar Nav Buttons
+        self.nav_btns = []
+        
+        self.btn_quick = ttk.Button(self.sidebar, text="🏠 Quick Merge", command=lambda: self.show_view("quick"))
+        self.btn_quick.pack(fill=tk.X, padx=10, pady=5)
+        self.nav_btns.append(self.btn_quick)
+        
+        self.btn_adv = ttk.Button(self.sidebar, text="⚙️ Advanced Editor", command=lambda: self.show_view("adv"))
+        self.btn_adv.pack(fill=tk.X, padx=10, pady=5)
+        self.nav_btns.append(self.btn_adv)
+        
+        self.btn_batch = ttk.Button(self.sidebar, text="📂 Batch Processing", command=lambda: self.show_view("batch"))
+        self.btn_batch.pack(fill=tk.X, padx=10, pady=5)
+        self.nav_btns.append(self.btn_batch)
+        
+        # Content Area 
+        self.content_area = ttk.Frame(self.main_container)
+        self.content_area.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        
+        # Create Views
+        self.views = {}
+        self.views["quick"] = ttk.Frame(self.content_area, padding=20)
+        self.views["adv"] = ttk.Frame(self.content_area, padding=20)
+        self.views["batch"] = ttk.Frame(self.content_area, padding=20)
+        
+        self.create_quick_merge_view(self.views["quick"])
+        self.create_advanced_editor_view(self.views["adv"])
+        self.create_batch_processing_view(self.views["batch"])
+        
+        # Default View
+        self.show_view("quick")
 
         # Status bar
         self.status_var = tk.StringVar(value='Ready')
         status_bar = ttk.Label(self.root, textvariable=self.status_var, relief=tk.SUNKEN, anchor=tk.W)
         status_bar.pack(fill=tk.X, side=tk.BOTTOM)
 
+    def show_view(self, view_name):
+        for view in self.views.values():
+            view.pack_forget()
+        self.views[view_name].pack(fill=tk.BOTH, expand=True)
+        
+        # Highlight active button
+        try:
+            for btn in self.nav_btns:
+                if USE_TTB:
+                    btn.configure(style='TButton') # Reset
+            if USE_TTB:
+                if view_name == 'quick': self.btn_quick.configure(style='primary.TButton')
+                elif view_name == 'adv': self.btn_adv.configure(style='primary.TButton')
+                elif view_name == 'batch': self.btn_batch.configure(style='primary.TButton')
+        except Exception:
+            pass
+
+    def create_quick_merge_view(self, parent):
+        ttk.Label(parent, text="Quick CSV Merge", font=("Segoe UI", 24, "bold")).pack(anchor=tk.W, pady=(0, 20))
+        
+        # Top half: horizontal split for files and settings
+        paned = tk.PanedWindow(parent, orient=tk.VERTICAL)
+        paned.pack(fill=tk.BOTH, expand=True)
+        
+        # ----------- Files Section -----------
+        files_frame = ttk.Frame(paned)
+        paned.add(files_frame, minsize=200)
+
+        # Toolbar inside files_frame
+        toolbar = ttk.Frame(files_frame)
+        toolbar.pack(fill=tk.X, pady=(0, 10))
+        btn_add = ttk.Button(toolbar, text='➕ Add Files', command=self.add_csv_files)
+        btn_add.pack(side=tk.LEFT, padx=(0, 5))
+        btn_add_folder = ttk.Button(toolbar, text='📁 Add Folder', command=self.add_folder_files)
+        btn_add_folder.pack(side=tk.LEFT, padx=5)
+        btn_clear = ttk.Button(toolbar, text="🗑 Clear All", command=self.clear_all_files)
+        btn_clear.pack(side=tk.LEFT, padx=5)
+        if USE_TTB:
+            btn_add.configure(style='info.TButton')
+            btn_add_folder.configure(style='info.TButton')
+            btn_clear.configure(style='danger.TButton')
+        
+        # File list
+        list_frame = ttk.LabelFrame(files_frame, text="Selected Files", padding="10")
+        list_frame.pack(fill=tk.BOTH, expand=True)
+        
+        scrollbar = ttk.Scrollbar(list_frame)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        self.files_tree = ttk.Treeview(list_frame, columns=('name', 'path'), show='headings', height=6)
+        self.files_tree.heading('name', text='Filename')
+        self.files_tree.heading('path', text='Folder')
+        self.files_tree.column('name', width=200)
+        self.files_tree.column('path', width=400)
+        self.files_tree.pack(fill=tk.BOTH, expand=True)
+        scrollbar.config(command=self.files_tree.yview)
+        self.files_tree.bind('<Delete>', lambda e: self.remove_selected_files())
+        self.files_tree.bind('<Double-1>', lambda e: self.open_selected_file())
+        self.files_tree.bind('<Button-3>', self.show_files_context_menu)
+        
+        self.file_count_label = ttk.Label(files_frame, text="No files selected", foreground="gray")
+        self.file_count_label.pack(anchor=tk.W, pady=(5,0))
+        
+        # ----------- Bottom Section: Previews and Config -----------
+        bottom_frame = ttk.Frame(paned)
+        paned.add(bottom_frame, minsize=250)
+        
+        # Split bottom into left (settings) and right (preview)
+        settings_frame = ttk.Frame(bottom_frame)
+        settings_frame.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 15))
+        
+        preview_container = ttk.LabelFrame(bottom_frame, text="Data Preview", padding="10")
+        preview_container.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        
+        # Quick Settings
+        config_frame = ttk.LabelFrame(settings_frame, text="Output Settings", padding="10")
+        config_frame.pack(fill=tk.X, pady=(0, 15))
+        
+        ttk.Label(config_frame, text="Output filename:").pack(anchor=tk.W)
+        ttk.Entry(config_frame, textvariable=self.output_filename, width=30).pack(fill=tk.X, pady=(2, 10))
+        
+        ttk.Label(config_frame, text="Output folder:").pack(anchor=tk.W)
+        out_dir_frame = ttk.Frame(config_frame)
+        out_dir_frame.pack(fill=tk.X, pady=(2, 10))
+        ttk.Entry(out_dir_frame, textvariable=self.output_dir, width=20).pack(side=tk.LEFT, expand=True, fill=tk.X)
+        ttk.Button(out_dir_frame, text='...', command=self.browse_output_dir, width=3).pack(side=tk.RIGHT, padx=(2,0))
+        
+        ttk.Label(config_frame, text="Format:").pack(anchor=tk.W)
+        format_frame = ttk.Frame(config_frame)
+        format_frame.pack(fill=tk.X, pady=(2, 10))
+        ttk.Radiobutton(format_frame, text="CSV", variable=self.export_format, value='csv').pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Radiobutton(format_frame, text="Excel", variable=self.export_format, value='excel').pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Radiobutton(format_frame, text="JSON", variable=self.export_format, value='json').pack(side=tk.LEFT)
+        
+        ttk.Checkbutton(config_frame, text="Remove duplicate rows", variable=self.remove_duplicate_rows).pack(anchor=tk.W, pady=5)
+        
+        # Merge Progress and Button
+        self.progress_var = tk.DoubleVar()
+        self.progressbar = ttk.Progressbar(settings_frame, variable=self.progress_var, mode='indeterminate')
+        
+        self.merge_btn = ttk.Button(settings_frame, text="▶ MERGE & EXPORT", command=self.start_merge)
+        if USE_TTB:
+            self.merge_btn.configure(style='success.TButton')
+        self.merge_btn.pack(fill=tk.X, pady=(10, 5), ipady=10)
+        
+        # Preview Area
+        preview_toolbar = ttk.Frame(preview_container)
+        preview_toolbar.pack(fill=tk.X, pady=(0, 5))
+        ttk.Button(preview_toolbar, text="👁️ Refresh Preview", command=self.generate_preview).pack(side=tk.LEFT)
+        
+        p_scroll = ttk.Scrollbar(preview_container)
+        p_scroll.pack(side=tk.RIGHT, fill=tk.Y)
+        self.preview_text = tk.Text(preview_container, height=10, yscrollcommand=p_scroll.set, bg='white', font=("Courier New", 9))
+        self.preview_text.pack(fill=tk.BOTH, expand=True)
+        p_scroll.config(command=self.preview_text.yview)
+
+    def create_advanced_editor_view(self, parent):
+        ttk.Label(parent, text="Advanced Editor", font=("Segoe UI", 24, "bold")).pack(anchor=tk.W, pady=(0, 20))
+        
+        # Scrollable canvas for advanced settings
+        canvas = tk.Canvas(parent, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(parent, orient="vertical", command=canvas.yview)
+        scrollable_frame = ttk.Frame(canvas)
+        
+        scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw", width=parent.winfo_width()-30)
+        
+        def on_canvas_configure(event):
+            canvas.itemconfig(canvas.find_withtag("all")[0], width=event.width)
+        canvas.bind('<Configure>', on_canvas_configure)
+        
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+        canvas.configure(yscrollcommand=scrollbar.set)
+        
+        # File Encoding
+        encoding_frame = ttk.LabelFrame(scrollable_frame, text="File Encoding", padding="10")
+        encoding_frame.pack(fill=tk.X, pady=(0, 15), padx=5)
+        ttk.Button(encoding_frame, text="🔍 Auto-detect Encodings...", command=self.detect_encodings).pack(anchor=tk.W)
+
+        # Columns
+        col_frame = ttk.LabelFrame(scrollable_frame, text="Column Tracking & Mapping", padding="10")
+        col_frame.pack(fill=tk.X, pady=(0, 15), padx=5)
+        
+        ttk.Button(col_frame, text="🔍 Configure Included Columns...", command=self.open_column_selector).pack(anchor=tk.W, pady=(0, 5))
+        self.selected_cols_text = tk.Text(col_frame, height=2, state='disabled', bg='#f5f5f5')
+        self.selected_cols_text.pack(fill=tk.X, pady=(0, 10))
+        
+        ttk.Button(col_frame, text="🗺️ Set Column Mapping...", command=self.open_column_mapping).pack(anchor=tk.W, pady=(0, 5))
+        self.mapping_text = tk.Text(col_frame, height=3, state='disabled', bg='#f5f5f5')
+        self.mapping_text.pack(fill=tk.X, pady=(0, 10))
+        
+        ttk.Label(col_frame, text="Duplicate Column Handling:", font=("Segoe UI", 9, "bold")).pack(anchor=tk.W, pady=(5,2))
+        ttk.Radiobutton(col_frame, text="Keep all (suffix _0, _1)", variable=self.duplicate_strategy, value='keep_all').pack(anchor=tk.W)
+        ttk.Radiobutton(col_frame, text="Keep first occurrence", variable=self.duplicate_strategy, value='first').pack(anchor=tk.W)
+        ttk.Radiobutton(col_frame, text="Merge duplicate columns", variable=self.duplicate_strategy, value='merge').pack(anchor=tk.W)
+
+        # Filtering & Validation
+        filter_frame = ttk.LabelFrame(scrollable_frame, text="Data Filtering & Missing Data", padding="10")
+        filter_frame.pack(fill=tk.X, pady=(0, 15), padx=5)
+        
+        ttk.Button(filter_frame, text="➕ Add Filter Rule...", command=self.add_filter).pack(anchor=tk.W, pady=(0, 5))
+        self.filters_text = tk.Text(filter_frame, height=4, state='disabled', bg='#f5f5f5')
+        self.filters_text.pack(fill=tk.X, pady=(0, 5))
+        btn_clear_filters = ttk.Button(filter_frame, text="🗑 Clear Filters", command=self.clear_filters)
+        if USE_TTB:
+            btn_clear_filters.configure(style='danger.TButton')
+        btn_clear_filters.pack(anchor=tk.W, pady=(0, 10))
+        
+        ttk.Label(filter_frame, text="Missing Data Strategy:", font=("Segoe UI", 9, "bold")).pack(anchor=tk.W, pady=(5,2))
+        miss_fr = ttk.Frame(filter_frame)
+        miss_fr.pack(fill=tk.X)
+        ttk.Radiobutton(miss_fr, text="Keep empty", variable=self.missing_data_strategy, value='keep').pack(side=tk.LEFT, padx=(0,10))
+        ttk.Radiobutton(miss_fr, text="Drop rows", variable=self.missing_data_strategy, value='drop').pack(side=tk.LEFT, padx=(0,10))
+        ttk.Radiobutton(miss_fr, text="Fill with 0", variable=self.missing_data_strategy, value='zero').pack(side=tk.LEFT, padx=(0,10))
+        ttk.Radiobutton(miss_fr, text="Fill 'N/A'", variable=self.missing_data_strategy, value='na').pack(side=tk.LEFT)
+        
+        # Validation rules UI setup
+        ttk.Button(filter_frame, text="✔️ Add Validation Rule...", command=self.add_validation_rule).pack(anchor=tk.W, pady=(15, 5))
+        self.validation_text = tk.Text(filter_frame, height=3, state='disabled', bg='#f5f5f5')
+        self.validation_text.pack(fill=tk.X)
+
+        # Merge Options
+        merge_frame = ttk.LabelFrame(scrollable_frame, text="Advanced Merge Options", padding="10")
+        merge_frame.pack(fill=tk.X, pady=(0, 15), padx=5)
+        
+        ttk.Radiobutton(merge_frame, text="Concatenate (stack)", variable=self.merge_type, value='concatenate', command=self.on_merge_type_change).pack(anchor=tk.W)
+        ttk.Radiobutton(merge_frame, text="Join on column (SQL-like)", variable=self.merge_type, value='join', command=self.on_merge_type_change).pack(anchor=tk.W)
+        
+        self.join_frame = ttk.Frame(merge_frame, padding="10")
+        self.join_frame.pack(fill=tk.X, pady=(5, 10))
+        ttk.Label(self.join_frame, text="Join Column Left:").grid(row=0, column=0, sticky=tk.W)
+        ttk.Combobox(self.join_frame, textvariable=self.join_column_left, width=20, state='readonly').grid(row=0, column=1, padx=5)
+        ttk.Label(self.join_frame, text="Join Column Right:").grid(row=1, column=0, sticky=tk.W, pady=(5, 0))
+        ttk.Combobox(self.join_frame, textvariable=self.join_column_right, width=20, state='readonly').grid(row=1, column=1, padx=5, pady=(5, 0))
+        if self.merge_type.get() != 'join':
+            self.join_frame.pack_forget()
+            
+        # Sorting
+        ttk.Label(merge_frame, text="Sorting:", font=("Segoe UI", 9, "bold")).pack(anchor=tk.W, pady=(10,2))
+        sort_fr = ttk.Frame(merge_frame)
+        sort_fr.pack(fill=tk.X)
+        ttk.Radiobutton(sort_fr, text="No sorting", variable=self.sort_option, value='none').pack(side=tk.LEFT, padx=(0,10))
+        ttk.Radiobutton(sort_fr, text="Auto date", variable=self.sort_option, value='date').pack(side=tk.LEFT, padx=(0,10))
+        ttk.Radiobutton(sort_fr, text="Custom", variable=self.sort_option, value='custom').pack(side=tk.LEFT)
+        
+        sort_config_frame = ttk.Frame(merge_frame)
+        sort_config_frame.pack(fill=tk.X, pady=(5, 10))
+        ttk.Label(sort_config_frame, text="Col:").pack(side=tk.LEFT)
+        self.sort_column_combo = ttk.Combobox(sort_config_frame, textvariable=self.sort_column, width=20, state='readonly')
+        self.sort_column_combo.pack(side=tk.LEFT, padx=(5, 15))
+        ttk.Radiobutton(sort_config_frame, text="Asc", variable=self.sort_order, value='ascending').pack(side=tk.LEFT, padx=(0,5))
+        ttk.Radiobutton(sort_config_frame, text="Desc", variable=self.sort_order, value='descending').pack(side=tk.LEFT)
+        
+        # Duplicate row keep (extra setting)
+        ttk.Label(merge_frame, text="If removing dup rows, keep:").pack(anchor=tk.W, pady=(5,2))
+        ttk.Combobox(merge_frame, textvariable=self.duplicate_row_keep, values=['first', 'last'], width=10, state='readonly').pack(anchor=tk.W)
+
+    def create_batch_processing_view(self, parent):
+        ttk.Label(parent, text="Batch Processing", font=("Segoe UI", 24, "bold")).pack(anchor=tk.W, pady=(0, 20))
+        
+        batch_frame = ttk.LabelFrame(parent, text="Saved Configurations", padding="10")
+        batch_frame.pack(fill=tk.X, pady=(0, 20))
+        
+        ttk.Label(batch_frame, text="Save your advanced setups to instantly reuse them on new files.", font=("Segoe UI", 10)).pack(anchor=tk.W, pady=(0,10))
+        
+        btn_fr = ttk.Frame(batch_frame)
+        btn_fr.pack(fill=tk.X)
+        ttk.Button(btn_fr, text="💾 Save Current Config", command=self.save_batch_config).pack(side=tk.LEFT, padx=(0,10))
+        ttk.Button(btn_fr, text="📂 Load Config", command=self.load_batch_config).pack(side=tk.LEFT, padx=(0,10))
+        
+        self.batch_text = tk.Text(batch_frame, height=5, state='disabled', bg='#f5f5f5')
+        self.batch_text.pack(fill=tk.BOTH, expand=True, pady=(10, 0))
+        btn_run_batch = ttk.Button(batch_frame, text="🚀 Run Selected Batch", command=self.run_batch_merge)
+        if USE_TTB:
+            btn_run_batch.configure(style='success.TButton')
+        btn_run_batch.pack(pady=(10,0), anchor=tk.W)
+        
+        recent_frame = ttk.LabelFrame(parent, text="Recent Merge History", padding="10")
+        recent_frame.pack(fill=tk.BOTH, expand=True)
+        
+        scrollbar = ttk.Scrollbar(recent_frame)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        self.recent_listbox = tk.Listbox(recent_frame, yscrollcommand=scrollbar.set, font=("Courier New", 9))
+        self.recent_listbox.pack(fill=tk.BOTH, expand=True)
+        scrollbar.config(command=self.recent_listbox.yview)
+        
+        self.update_recent_list()
+        self.update_batch_display()
+
     def update_status(self, text):
         try:
             self.status_var.set(text)
         except Exception:
             pass
-    
+
     def on_merge_type_change(self):
         """Show/hide join configuration based on merge type"""
         if self.merge_type.get() == 'join':
-            self.join_frame.pack(fill=tk.X, pady=(0, 15), after=self.join_frame.master.winfo_children()[0])
+            if hasattr(self, 'join_frame') and self.join_frame.winfo_exists():
+                self.join_frame.pack(fill=tk.X, pady=(5, 10))
         else:
-            self.join_frame.pack_forget()
-    
+            if hasattr(self, 'join_frame') and self.join_frame.winfo_exists():
+                self.join_frame.pack_forget()
+
     def add_csv_files(self):
         """Add individual CSV files"""
         files = filedialog.askopenfilenames(title="Select CSV files", filetypes=[("CSV files", "*.csv"), ("All files", "*.*")])
@@ -1265,6 +1265,11 @@ class AdvancedCSVMergerApp:
         self.update_status('Merging...')
 
     def perform_merge_and_export(self, files):
+        if hasattr(self, 'progressbar'):
+            self.root.after(0, lambda: self.progressbar.pack(fill=tk.X, pady=5, before=self.merge_btn))
+            self.root.after(0, self.progressbar.start)
+            if hasattr(self, 'merge_btn'):
+                self.root.after(0, lambda: self.merge_btn.configure(state='disabled', text="Merging..."))
         self.log_to_app('=== Merge started ===\n')
         try:
             dfs = []
@@ -1438,8 +1443,18 @@ class AdvancedCSVMergerApp:
                 pass
 
         except Exception as e:
+            if hasattr(self, 'progressbar'):
+                self.root.after(0, self.progressbar.stop)
+                self.root.after(0, self.progressbar.pack_forget)
+                if hasattr(self, 'merge_btn'):
+                    self.root.after(0, lambda: self.merge_btn.configure(state='normal', text="▶ MERGE & EXPORT"))
             self.log_to_app(f'Error during merge: {e}\n')
         finally:
+            if hasattr(self, 'progressbar'):
+                self.root.after(0, self.progressbar.stop)
+                self.root.after(0, self.progressbar.pack_forget)
+                if hasattr(self, 'merge_btn'):
+                    self.root.after(0, lambda: self.merge_btn.configure(state='normal', text="▶ MERGE & EXPORT"))
             self.log_to_app('=== Merge finished ===\n')
             try:
                 self.update_status('Ready')
